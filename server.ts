@@ -13,6 +13,74 @@ async function startServer() {
 
   app.use(express.json());
 
+  
+  // ML Service configuration
+  const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8001';
+
+  // Proxy requests to the demand forecasting model
+  app.post('/api/ml/demand', async (req: Request, res: Response) => {
+    try {
+      const response = await fetch(`${ML_SERVICE_URL}/predict/demand`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        res.status(response.status).json({
+          success: false,
+          error: data.detail || 'Demand prediction failed.',
+        });
+        return;
+      }
+
+      res.status(200).json({ success: true, prediction: data });
+    } catch (err) {
+      console.error('[ML Demand Error]:', err);
+      res.status(503).json({
+        success: false,
+        error: 'ML service unavailable. Please try again later.',
+      });
+    }
+  });
+
+  // Proxy requests to the transaction-review classifier
+  app.post('/api/ml/transaction-review', async (req: Request, res: Response) => {
+    try {
+      const response = await fetch(
+        `${ML_SERVICE_URL}/predict/transaction-review`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(req.body),
+          signal: AbortSignal.timeout(10000),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        res.status(response.status).json({
+          success: false,
+          error: data.detail || 'Transaction review prediction failed.',
+        });
+        return;
+      }
+
+      res.status(200).json({ success: true, prediction: data });
+    } catch (err) {
+      console.error('[ML Transaction Review Error]:', err);
+      res.status(503).json({
+        success: false,
+        error: 'ML service unavailable. Please try again later.',
+      });
+    }
+  });
+
+
   // Health and System Status Endpoint
   app.get('/api/health', (_req: Request, res: Response) => {
     res.json({
